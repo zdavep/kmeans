@@ -4,4 +4,4 @@ Parallel k-means clustering in Haskell.
 
 To run:
 
-    stack run -- +RTS -N4
+    stack run -- +RTS -ls -N4

@@ -20,7 +20,7 @@ test:
 	@stack test
 
 run:
-	@stack run -- +RTS -N4
+	@stack run -- +RTS -ls -N4
 
 clean:
 	@rm -rf .stack-work kmeans.cabal

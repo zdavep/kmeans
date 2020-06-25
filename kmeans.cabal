@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 52e662132bd9cafca8771ce4ecd68fe15e6e463f8467c90115ff4910cf5a4b27
+-- hash: cb32f96fc9a06f974527014f52ef5233e7f750cd2f0ef2f73b722892e908cfbd
 
 name:           kmeans
 version:        0.1.0.0
@@ -48,7 +48,7 @@ executable kmeans-exe
   hs-source-dirs:
       app
   default-extensions: DeriveGeneric
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -eventlog
   build-depends:
       base >=4.7 && <5
     , binary
