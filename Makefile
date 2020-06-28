@@ -23,7 +23,7 @@ run:
 	@stack run -- +RTS -ls -N4
 
 clean:
-	@rm -rf .stack-work kmeans.cabal
+	@rm -rf .stack-work kmeans.cabal *.eventlog
 
 repl:
 	@stack repl

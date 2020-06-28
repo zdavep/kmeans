@@ -15,26 +15,26 @@ import GHC.Generics
 -- -----------------------------------------------------------------------------
 -- Point
 
+-- An X and Y coordinate pair.
 data Point =
-  Point {-#UNPACK#-} !Double
-        {-#UNPACK#-} !Double
+  Point {-# UNPACK #-} !Double -- X coordinate
+        {-# UNPACK #-} !Double -- y coordinate
   deriving
-    ( Eq
-    , Ord
-    , Read
-    , Show
-    , Generic
-    )
+    (Eq, Ord, Read, Show, Generic)
 
+-- Forces full evaluation of Point to normal form.
 instance NFData Point
 
+-- Allows for points to be read from file in binary format.
 instance Binary Point where
   put (Point x y) = put x >> put y
   get = do x <- get; Point x <$> get
 
+-- Distance function
 sqDistance :: Point -> Point -> Double
 sqDistance (Point x1 y1) (Point x2 y2) = ((x1 - x2)^2) + ((y1 - y2)^2)
 
+-- Reads all points from a binary file and unpacks them to a list.
 readPoints :: FilePath -> IO [Point]
 readPoints f = do
   s <- B.readFile f
@@ -51,16 +51,16 @@ data PointSum = PointSum !Int !Double !Double
 instance Semigroup PointSum where
   (PointSum c1 x1 y1) <> (PointSum c2 x2 y2) = PointSum (c1+c2) (x1+x2) (y1+y2)
 
-addToPointSum :: PointSum -> Point -> PointSum
-addToPointSum (PointSum count xs ys) (Point x y) =
+addPointToSum :: PointSum -> Point -> PointSum
+addPointToSum (PointSum count xs ys) (Point x y) =
   PointSum (count + 1) (xs + x) (ys + y)
 
 pointSumToCluster :: Int -> PointSum -> Cluster
-pointSumToCluster id (PointSum count xs ys) =
-  Cluster
-    { clId = id
-    , clCent = Point (xs / fromIntegral count) (ys / fromIntegral count)
-    }
+pointSumToCluster i (PointSum c xs ys) =
+    Cluster i (Point x y)
+  where
+    x = xs / fromIntegral c
+    y = ys / fromIntegral c
 
 combinePointSums :: V.Vector PointSum -> V.Vector PointSum -> V.Vector PointSum
 combinePointSums = V.zipWith (<>)
@@ -73,13 +73,9 @@ data Cluster = Cluster
   , clCent :: {-# UNPACK #-} !Point
   }
   deriving
-    ( Eq
-    , Ord
-    , Read
-    , Show
-    , Generic
-    )
+    (Eq, Ord, Read, Show, Generic)
 
+-- Forces full evaluation of Cluster to normal form.
 instance NFData Cluster
 
 makeNewClusters :: V.Vector PointSum -> [Cluster]
@@ -92,17 +88,16 @@ makeNewClusters vec =
 -- -----------------------------------------------------------------------------
 -- Assign points to clusters
 
-assign :: Int -> [Cluster] -> [Point] -> V.Vector PointSum
-assign n clusters points = V.create $ do
-  vec <- MV.replicate n (PointSum 0 0 0)
+assign :: [Cluster] -> [Point] -> V.Vector PointSum
+assign clusters points = V.create $ do
+  vec <- MV.replicate (length clusters) (PointSum 0 0 0)
   let
     addpoint p = do
       let c = nearest p; cid = clId c
       ps <- MV.read vec cid
-      MV.write vec cid $! addToPointSum ps p
+      MV.write vec cid $! addPointToSum ps p
   mapM_ addpoint points
   return vec
   where
     distances p = [(c, sqDistance (clCent c) p) | c <- clusters]
     nearest p = fst $ minimumBy (compare `on` snd) (distances p)
-

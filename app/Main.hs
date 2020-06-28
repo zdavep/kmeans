@@ -6,8 +6,8 @@ import Control.Parallel.Strategies
 
 import Data.Binary     (decodeFile)
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
-
-import Text.Printf (printf)
+import Debug.Trace     (trace)
+import Text.Printf     (printf)
 
 import KMeans
 
@@ -18,11 +18,8 @@ main :: IO ()
 main = runInUnboundThread $ do
   points <- decodeFile "points.bin"
   clusters <- read <$> readFile "clusters"
-  let numChunks = 64
-      num = length clusters
-  npoints <- evaluate (length points)
   t0 <- getCurrentTime
-  finalClusters <- kmeansStrat numChunks num points clusters
+  finalClusters <- kmeansStrat 64 points clusters
   printTimeSince t0
   putStrLn "final clusters:"
   putStrLn $ unlines $ map show finalClusters
@@ -31,34 +28,32 @@ main = runInUnboundThread $ do
 -- Split a list into a list of lists
 
 split :: Int -> [a] -> [[a]]
-split numChunks xs = chunk (length xs `quot` numChunks) xs
+split n xs = chunk (length xs `quot` n) xs
   where chunk _ [] = []
         chunk n ys = let (as, bs) = splitAt n ys in as : chunk n bs
 
 -- -----------------------------------------------------------------------------
--- Assign points to clusters in parallel
+-- Parallel K-Means algorithm. Assign points to clusters until a maximum
+-- number of iterations (100) occur, or the clusters converge.
 
-parStepStrat :: Int -> [Cluster] -> [[Point]] -> [Cluster]
-parStepStrat num clusters points =
-  makeNewClusters $
-    foldr1 combinePointSums (map (assign num clusters) points `using` parList rseq)
+kmeansStrat :: Int -> [Point] -> [Cluster] -> IO [Cluster]
+kmeansStrat n points = loop 0 where
+  chunks = split n points
+  loop i _ | trace ("i = " <> show i) False = undefined
+  loop i c | i > 100 = return c
+  loop i c = do
+    let c' = parStepStrat c chunks
+    if c' == c then return c else loop (i+1) c'
 
 -- -----------------------------------------------------------------------------
--- Parallel K-Means algorithm. Assign points to clusters until a maximum
--- number of iterations occur, or the clusters converge.
+-- Assign points to clusters in parallel
 
-maxLoops :: Int
-maxLoops = 80
-
-kmeansStrat :: Int -> Int -> [Point] -> [Cluster] -> IO [Cluster]
-kmeansStrat numChunks num points = loop 0 where
-  chunks = split numChunks points
-  loop i clusters | i > maxLoops =
-    return clusters
-  loop i clusters = do
-    let clusters' = parStepStrat num clusters chunks
-    if clusters' == clusters
-      then return clusters else loop (i+1) clusters'
+parStepStrat :: [Cluster] -> [[Point]] -> [Cluster]
+parStepStrat clusters points =
+  makeNewClusters $
+    foldr1 combinePointSums (map assignPoints points `using` parList rseq)
+  where
+    assignPoints = assign clusters
 
 -- -----------------------------------------------------------------------------
 -- Print a time difference
