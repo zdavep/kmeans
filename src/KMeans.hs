@@ -12,10 +12,7 @@ import qualified Data.Vector.Mutable   as MV
 
 import GHC.Generics
 
--- -----------------------------------------------------------------------------
--- Point
-
--- An X and Y coordinate pair.
+-- Point is a X and Y coordinate pair.
 data Point =
   Point {-# UNPACK #-} !Double -- X coordinate
         {-# UNPACK #-} !Double -- y coordinate
@@ -42,42 +39,45 @@ readPoints f = do
       points = [ Point (read (B.unpack xs)) (read (B.unpack ys)) | (xs:ys:_) <- ls ]
   return points
 
--- -----------------------------------------------------------------------------
--- PointSum
-
-data PointSum = PointSum !Int !Double !Double
+-- PointSum is a summation of a group of points.
+data PointSum =
+  PointSum !Int     -- Number of points
+           !Double  -- Sum of X coordinates
+           !Double  -- Sum of Y coordinates
   deriving (Eq, Show)
 
+-- Combine two point sums.
 instance Semigroup PointSum where
   (PointSum c1 x1 y1) <> (PointSum c2 x2 y2) = PointSum (c1+c2) (x1+x2) (y1+y2)
 
+-- Add a point to a point sum.
 addPointToSum :: PointSum -> Point -> PointSum
 addPointToSum (PointSum count xs ys) (Point x y) =
   PointSum (count + 1) (xs + x) (ys + y)
 
+-- Calculate the cluster center and return a new cluster with the given ID.
 pointSumToCluster :: Int -> PointSum -> Cluster
-pointSumToCluster i (PointSum c xs ys) =
-    Cluster i (Point x y)
+pointSumToCluster clusterId (PointSum c xs ys) =
+    Cluster clusterId (Point x y)
   where
     x = xs / fromIntegral c
     y = ys / fromIntegral c
 
+-- Combine two point sum vectors.
 combinePointSums :: V.Vector PointSum -> V.Vector PointSum -> V.Vector PointSum
 combinePointSums = V.zipWith (<>)
 
--- -----------------------------------------------------------------------------
--- Cluster
-
+-- Cluster defines the central point in a group of points.
 data Cluster = Cluster
-  { clId   :: {-# UNPACK #-} !Int
-  , clCent :: {-# UNPACK #-} !Point
+  { clId   :: {-# UNPACK #-} !Int   -- Cluster identifier
+  , clCent :: {-# UNPACK #-} !Point -- Central point in the cluster
   }
-  deriving
-    (Eq, Ord, Read, Show, Generic)
+  deriving (Eq, Ord, Read, Show, Generic)
 
 -- Forces full evaluation of Cluster to normal form.
 instance NFData Cluster
 
+-- Convert a vector of point sums to a list of clusters.
 makeNewClusters :: V.Vector PointSum -> [Cluster]
 makeNewClusters vec =
   [ pointSumToCluster cid ps
@@ -85,9 +85,7 @@ makeNewClusters vec =
   , count > 0
   ]
 
--- -----------------------------------------------------------------------------
--- Assign points to clusters
-
+-- Assign points to clusters producing a new point sum vector.
 assign :: [Cluster] -> [Point] -> V.Vector PointSum
 assign clusters points = V.create $ do
   vec <- MV.replicate (length clusters) (PointSum 0 0 0)
